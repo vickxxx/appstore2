@@ -399,112 +399,118 @@ func (c *StoreClient) ParseNotificationV2(tokenStr string) (*jwt.Token, error) {
 	})
 }
 
-func (c *StoreClient) ParseNotificationV2WithClaim(tokenStr string) (jwt.Claims, error) {
+func (c *StoreClient) ParseNotificationV2WithClaim(tokenStr string) (*jwt.Token, jwt.Claims, error) {
 	result := &jwt.RegisteredClaims{}
-	_, err := jwt.ParseWithClaims(tokenStr, result, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, result, func(token *jwt.Token) (interface{}, error) {
 		return c.cert.extractPublicKeyFromToken(tokenStr)
 	})
-	return result, err
+	return token, result, err
 }
 
 // ParseSignedPayload parses any signed JWS payload from a server notification into
 // a struct that implements the jwt.Claims interface.
-func (c *StoreClient) ParseSignedPayload(tokenStr string, claims jwt.Claims) error {
-	_, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
+func (c *StoreClient) ParseSignedPayload(tokenStr string, claims jwt.Claims) (*jwt.Token, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
 		return c.cert.extractPublicKeyFromToken(tokenStr)
 	})
 
-	return err
+	return token, err
 }
 
 // ParseNotificationV2 parses the signedPayload field from an App Store Server Notification response body
 // (https://developer.apple.com/documentation/appstoreservernotifications/responsebodyv2)
-func (c *StoreClient) ParseNotificationV2Payload(signedPayload string) (*NotificationPayload, error) {
+func (c *StoreClient) ParseNotificationV2Payload(signedPayload string) (*jwt.Token, *NotificationPayload, error) {
 	var result NotificationPayload
-	if err := c.ParseSignedPayload(signedPayload, &result); err != nil {
-		return nil, err
+	token, err := c.ParseSignedPayload(signedPayload, &result)
+	if err != nil {
+		return token, nil, err
 	}
 
-	return &result, nil
+	return token, &result, nil
 }
 
 // ParseNotificationV2 parses the signedTransactionInfo from decoded notification data
 // (https://developer.apple.com/documentation/appstoreservernotifications/data)
-func (c *StoreClient) ParseNotificationV2TransactionInfo(signedTransactionInfo string) (*JWSTransaction, error) {
+func (c *StoreClient) ParseNotificationV2TransactionInfo(signedTransactionInfo string) (*jwt.Token, *JWSTransaction, error) {
 	var result JWSTransaction
-	if err := c.ParseSignedPayload(signedTransactionInfo, &result); err != nil {
-		return nil, err
+	token, err := c.ParseSignedPayload(signedTransactionInfo, &result)
+	if err != nil {
+		return token, nil, err
 	}
 
-	return &result, nil
+	return token, &result, nil
 }
 
 // ParseNotificationV2 parses the signedRenewalInfo from decoded notification data
 // (https://developer.apple.com/documentation/appstoreservernotifications/data)
-func (c *StoreClient) ParseNotificationV2RenewalInfo(signedRenewalInfo string) (*JWSRenewalInfoDecodedPayload, error) {
+func (c *StoreClient) ParseNotificationV2RenewalInfo(signedRenewalInfo string) (*jwt.Token, *JWSRenewalInfoDecodedPayload, error) {
 	var result JWSRenewalInfoDecodedPayload
-	if err := c.ParseSignedPayload(signedRenewalInfo, &result); err != nil {
-		return nil, err
+	token, err := c.ParseSignedPayload(signedRenewalInfo, &result)
+	if err != nil {
+		return token, nil, err
 	}
 
-	return &result, nil
+	return token, &result, nil
 }
 
 // ParseSignedTransactions parse the jws singed transactions
 // Per doc: https://datatracker.ietf.org/doc/html/rfc7515#section-4.1.6
-func (c *StoreClient) ParseSignedTransactions(transactions []string) ([]*JWSTransaction, error) {
+func (c *StoreClient) ParseSignedTransactions(transactions []string) (*jwt.Token, []*JWSTransaction, error) {
 	result := make([]*JWSTransaction, 0)
+	var tok *jwt.Token
 	for _, v := range transactions {
-		trans, err := c.parseSignedTransaction(v)
+		token, trans, err := c.parseSignedTransaction(v)
 		if err == nil && trans != nil {
 			result = append(result, trans)
+			tok = token
 		}
+
 	}
 
-	return result, nil
+	return tok, result, nil
 }
 
 // ParseJWSEncodeString parse the jws encode string, such as JWSTransaction and JWSRenewalInfoDecodedPayload
-func (c *StoreClient) ParseJWSEncodeString(jwsEncode string) (interface{}, error) {
+func (c *StoreClient) ParseJWSEncodeString(jwsEncode string) (*jwt.Token, interface{}, error) {
 	// Split the JWS format string into its three parts
 	parts := strings.Split(jwsEncode, ".")
 
 	// Decode the payload part of the JWS format string
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Determine which struct to use based on the payload contents
 	if strings.Contains(string(payload), "transactionId") {
 		transaction := &JWSTransaction{}
-		err = c.parseJWS(jwsEncode, transaction)
-		return transaction, err
+		token, err := c.parseJWS(jwsEncode, transaction)
+		return token, transaction, err
 	} else if strings.Contains(string(payload), "renewalDate") {
 		renewalInfo := &JWSRenewalInfoDecodedPayload{}
-		err = c.parseJWS(jwsEncode, renewalInfo)
-		return renewalInfo, err
+		token, err := c.parseJWS(jwsEncode, renewalInfo)
+		return token, renewalInfo, err
 	}
 
-	return nil, nil
+	return nil, nil, nil
 }
 
-func (c *StoreClient) parseJWS(jwsEncode string, claims jwt.Claims) error {
-	_, err := jwt.ParseWithClaims(jwsEncode, claims, func(token *jwt.Token) (interface{}, error) {
+func (c *StoreClient) parseJWS(jwsEncode string, claims jwt.Claims) (*jwt.Token, error) {
+	token, err := jwt.ParseWithClaims(jwsEncode, claims, func(token *jwt.Token) (interface{}, error) {
 		return c.cert.extractPublicKeyFromToken(jwsEncode)
 	})
-	return err
+	return token, err
 }
 
-func (c *StoreClient) parseSignedTransaction(transaction string) (*JWSTransaction, error) {
+func (c *StoreClient) parseSignedTransaction(transaction string) (*jwt.Token, *JWSTransaction, error) {
 	tran := &JWSTransaction{}
 
-	err := c.parseJWS(transaction, tran)
+	token, err := c.parseJWS(transaction, tran)
 	if err != nil {
-		return nil, err
+		return token, nil, err
 	}
 
-	return tran, nil
+	return token, tran, nil
 }
 
 // Per doc: https://developer.apple.com/documentation/appstoreserverapi#topics

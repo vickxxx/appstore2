@@ -53,7 +53,7 @@ func TestStoreClient_LookupOrderID(t *testing.T) {
 				t.Errorf("LookupOrderID() gotRsp = %v, want %v", gotRsp, tt.wantRsp)
 			}
 
-			orders, err := a.ParseSignedTransactions(gotRsp.SignedTransactions)
+			_, orders, err := a.ParseSignedTransactions(gotRsp.SignedTransactions)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LookupOrderID() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -103,7 +103,7 @@ func TestStoreClient_GetTransactionHistory(t *testing.T) {
 			}
 
 			for _, rsp := range gotRsp {
-				trans, err := a.ParseSignedTransactions(rsp.SignedTransactions)
+				_, trans, err := a.ParseSignedTransactions(rsp.SignedTransactions)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("GetTransactionHistory() error = %v, wantErr %v", err, tt.wantErr)
 					return
@@ -153,7 +153,7 @@ func TestStoreClient_GetRefundHistory(t *testing.T) {
 
 			for _, rsp := range gotRsp {
 				t.Logf("%+v", rsp.SignedTransactions)
-				trans, err := a.ParseSignedTransactions(rsp.SignedTransactions)
+				_, trans, err := a.ParseSignedTransactions(rsp.SignedTransactions)
 				t.Logf("%+v", trans)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("GetTransactionHistory() error = %v, wantErr %v", err, tt.wantErr)
