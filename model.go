@@ -1,4 +1,4 @@
-package appstore
+package appstore2
 
 import (
 	"github.com/golang-jwt/jwt/v5"

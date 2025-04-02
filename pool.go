@@ -1,4 +1,4 @@
-package appstore
+package appstore2
 
 import (
 	"crypto/x509"

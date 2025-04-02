@@ -1,4 +1,4 @@
-module github.com/richzw/appstore
+module github.com/vickxxx/appstore2
 
 go 1.18
 
