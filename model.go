@@ -368,6 +368,8 @@ type NotificationPayload struct {
 	Subtype             string           `json:"subtype"`
 	NotificationUUID    string           `json:"notificationUUID"`
 	NotificationVersion string           `json:"notificationVersion"`
+	Version             string           `json:"version"`
+	SignedDate          int64            `json:"signedDate"`
 	Data                NotificationData `json:"data"`
 }
 
